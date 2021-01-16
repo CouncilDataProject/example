@@ -41,26 +41,36 @@ RAND_BODY_RANGE = (1, 100)
 RAND_EVENT_MINUTES_ITEMS_RANGE = (5, 10)
 RAND_MATTER_RANGE = (1, 1000)
 
-ALL_EVENT_MINUTES_ITEM_DECISIONS = get_all_class_attr_values(EventMinutesItemDecision)
+ALL_EVENT_MINUTES_ITEM_DECISIONS = get_all_class_attr_values(
+    EventMinutesItemDecision
+)
 PASSING_VOTE_DECISIONS = [VoteDecision.APPROVE]
 FAILING_VOTE_DECISIONS = [VoteDecision.ABSTAIN, VoteDecision.REJECT]
+
+DUMMY_FILE_URI = (
+    "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
+)
+PERSON_PICTURE_URI = (
+    "https://councildataproject.github.io/imgs/public-speaker-light-purple.svg"
+)
+SEAT_URI = "https://councildataproject.github.io/imgs/seattle.jpg"
 
 SESSIONS = [
     (
         "https://youtu.be/BkWNBqlZjGk",
-        "https://www.seattlechannel.org/documents/seattlechannel/closedcaption/2020/council_101220_2022077.vtt",
+        "https://www.seattlechannel.org/documents/seattlechannel/closedcaption/2020/council_101220_2022077.vtt", # noqa
     ),
     (
         "https://youtu.be/DU1pycy73yI",
-        "https://www.seattlechannel.org/documents/seattlechannel/closedcaption/2020/council_113020_2022091.vtt",
+        "https://www.seattlechannel.org/documents/seattlechannel/closedcaption/2020/council_113020_2022091.vtt", # noqa
     ),
     (
         "https://youtu.be/ePTZs5ZxCnc",
-        "https://www.seattlechannel.org/documents/seattlechannel/closedcaption/2020/brief_112320_2012089.vtt",
+        "https://www.seattlechannel.org/documents/seattlechannel/closedcaption/2020/brief_112320_2012089.vtt", # noqa
     ),
     (
         "https://youtu.be/51jNLMQ3qB8",
-        "https://www.seattlechannel.org/documents/seattlechannel/closedcaption/2020/council_110920_2022085.vtt",
+        "https://www.seattlechannel.org/documents/seattlechannel/closedcaption/2020/council_110920_2022085.vtt", # noqa
     ),
     ("https://youtu.be/fgr2sYYJy0Q", None),
 ]
@@ -76,19 +86,23 @@ def _get_example_person(seat_num: int) -> Person:
     if seat_num == 1:
         # Add Council President role for seat position 1
         roles.append(
-            Role(title="Council President", body=Body(name="Example Committee"))
+            Role(
+                title="Council President", body=Body(name="Example Committee")
+            )
         )
+    # Get the seat electoral type num
+    seat_electoral_type = 1 if seat_num <= NUM_COUNCIL_SEATS // 2 else 2
     return Person(
         name=f"Example Person {seat_num}",
         email="person@example.com",
         phone="123-456-7890",
         website="www.example.com",
-        picture_uri="https://councildataproject.github.io/imgs/public-speaker-light-purple.svg",
+        picture_uri=PERSON_PICTURE_URI,
         seat=Seat(
             name=f"Example Seat Position {seat_num}",
             electoral_area=f"Example Electoral Area {seat_num}",
-            electoral_type=f"Example Electoral Type {1 if seat_num <= NUM_COUNCIL_SEATS // 2 else 2 }",
-            image_uri="https://councildataproject.github.io/imgs/seattle.jpg",
+            electoral_type=f"Example Electoral Type {seat_electoral_type}",
+            image_uri=SEAT_URI,
         ),
         roles=roles,
     )
@@ -108,7 +122,9 @@ def _get_example_event() -> EventIngestionModel:
             video_uri=session[0],
             caption_uri=session[1],
         )
-        for i, session in enumerate(random.sample(SESSIONS, random.randint(1, 3)))
+        for i, session in enumerate(
+            random.sample(SESSIONS, random.randint(1, 3))
+        )
     ]
     # Get a number of event minutes items for the event
     num_event_minutes_items = random.randint(*RAND_EVENT_MINUTES_ITEMS_RANGE)
@@ -126,13 +142,15 @@ def _get_example_event() -> EventIngestionModel:
         [
             *random.choices(
                 PASSING_VOTE_DECISIONS
-                if event_minutes_item_decisions[i] == EventMinutesItemDecision.PASSED
+                if event_minutes_item_decisions[i]
+                == EventMinutesItemDecision.PASSED
                 else FAILING_VOTE_DECISIONS,
                 k=vote_majority_nums[i],
             ),
             *random.choices(
                 FAILING_VOTE_DECISIONS
-                if event_minutes_item_decisions[i] == EventMinutesItemDecision.PASSED
+                if event_minutes_item_decisions[i]
+                == EventMinutesItemDecision.PASSED
                 else PASSING_VOTE_DECISIONS,
                 k=NUM_COUNCIL_SEATS - vote_majority_nums[i],
             ),
@@ -141,10 +159,15 @@ def _get_example_event() -> EventIngestionModel:
     ]
     # Get a matter number for each event minutes item
     matter_nums = random.sample(
-        range(RAND_MATTER_RANGE[0], RAND_MATTER_RANGE[1] + 1), num_event_minutes_items
+        range(RAND_MATTER_RANGE[0], RAND_MATTER_RANGE[1] + 1),
+        num_event_minutes_items,
     )
-    # Bin/discretize matter num. The bin num for each matter are used to determine the matter type and sponsor of the matter
-    bins = range(0, RAND_MATTER_RANGE[1], RAND_MATTER_RANGE[1] // NUM_COUNCIL_SEATS)
+    # Bin/discretize matter num.
+    # The bin num for each matter are used to
+    # determine the matter type and sponsor of the matter
+    bins = range(
+        0, RAND_MATTER_RANGE[1], RAND_MATTER_RANGE[1] // NUM_COUNCIL_SEATS
+    )
     bin_nums = [bisect_left(bins, matter_num) for matter_num in matter_nums]
     # Create a list of event minutes item for the event
     event_minutes_items = [
@@ -163,7 +186,7 @@ def _get_example_event() -> EventIngestionModel:
             supporting_files=[
                 SupportingFile(
                     name=f"Example Supporting File Name {file_num}",
-                    uri="https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+                    uri=DUMMY_FILE_URI,
                 )
                 for file_num in range(1, random.randint(1, 5) + 1)
             ],
@@ -191,6 +214,6 @@ def _get_example_event() -> EventIngestionModel:
         body=body,
         sessions=sessions,
         event_minutes_items=event_minutes_items,
-        agenda_uri="https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
-        minutes_uri="https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+        agenda_uri=DUMMY_FILE_URI,
+        minutes_uri=DUMMY_FILE_URI,
     )
