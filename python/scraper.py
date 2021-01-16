@@ -2,10 +2,15 @@
 # -*- coding: utf-8 -*-
 
 import random
+from bisect import bisect_left
 from datetime import datetime, timedelta
 from typing import List
 
-from cdp_backend.database.constants import EventMinutesItemDecision, MatterStatusDecision, VoteDecision
+from cdp_backend.database.constants import (
+    EventMinutesItemDecision,
+    MatterStatusDecision,
+    VoteDecision,
+)
 from cdp_backend.pipeline.ingestion_models import (
     Body,
     EventIngestionModel,
@@ -33,12 +38,12 @@ def get_events() -> List[EventIngestionModel]:
 
 NUM_COUNCIL_SEATS = 10
 RAND_BODY_RANGE = (1, 100)
-RAND_EVENT_MINUTES_ITEMS_RANGE = (5, 15)
-RAND_MATTER_RANGE = (1, 100)
+RAND_EVENT_MINUTES_ITEMS_RANGE = (5, 10)
+RAND_MATTER_RANGE = (1, 1000)
 
-ALL_EVENT_MINUTES_ITEM_DECISION = get_all_class_attr_values(EventMinutesItemDecision)
-ALL_MATTER_STATUS_DECISION = get_all_class_attr_values(MatterStatusDecision)
-ALL_VOTE_DECISION = get_all_class_attr_values(VoteDecision)
+ALL_EVENT_MINUTES_ITEM_DECISIONS = get_all_class_attr_values(EventMinutesItemDecision)
+PASSING_VOTE_DECISIONS = [VoteDecision.APPROVE]
+FAILING_VOTE_DECISIONS = [VoteDecision.ABSTAIN, VoteDecision.REJECT]
 
 SESSIONS = [
     (
@@ -82,7 +87,7 @@ def _get_example_person(seat_num: int) -> Person:
         seat=Seat(
             name=f"Example Seat Position {seat_num}",
             electoral_area=f"Example Electoral Area {seat_num}",
-            electoral_type=f"Example Electoral Type {1 if seat_num <= NUM_COUNCIL_SEATS / 2 else 2 }",
+            electoral_type=f"Example Electoral Type {1 if seat_num <= NUM_COUNCIL_SEATS // 2 else 2 }",
             image_uri="https://councildataproject.github.io/imgs/seattle.jpg",
         ),
         roles=roles,
@@ -107,15 +112,40 @@ def _get_example_event() -> EventIngestionModel:
     ]
     # Get a number of event minutes items for the event
     num_event_minutes_items = random.randint(*RAND_EVENT_MINUTES_ITEMS_RANGE)
-    # Get a matter number for each event minutes item
-    matter_nums = random.sample(range(RAND_MATTER_RANGE[0], RAND_MATTER_RANGE[1] + 1), num_event_minutes_items)
-    # Get a number of sponsors for each event minutes item
-    nums_sponsors = random.choices(range(1, 4), k=num_event_minutes_items)
-    # Specify the seat position for each sponsor
-    sponsors_seats = [
-        random.sample(range(1, NUM_COUNCIL_SEATS + 1), num_sponsors)
-        for num_sponsors in nums_sponsors
+    # Get the decision for each event minutes item
+    event_minutes_item_decisions = random.choices(
+        ALL_EVENT_MINUTES_ITEM_DECISIONS, k=num_event_minutes_items
+    )
+    # Get the majority number of votes for each event minutes item
+    vote_majority_nums = random.choices(
+        range(NUM_COUNCIL_SEATS // 2 + 1, NUM_COUNCIL_SEATS + 1),
+        k=num_event_minutes_items,
+    )
+    # Get the vote decisions for each event minutes item
+    vote_decisions = [
+        [
+            *random.choices(
+                PASSING_VOTE_DECISIONS
+                if event_minutes_item_decisions[i] == EventMinutesItemDecision.PASSED
+                else FAILING_VOTE_DECISIONS,
+                k=vote_majority_nums[i],
+            ),
+            *random.choices(
+                FAILING_VOTE_DECISIONS
+                if event_minutes_item_decisions[i] == EventMinutesItemDecision.PASSED
+                else PASSING_VOTE_DECISIONS,
+                k=NUM_COUNCIL_SEATS - vote_majority_nums[i],
+            ),
+        ]
+        for i in range(num_event_minutes_items)
     ]
+    # Get a matter number for each event minutes item
+    matter_nums = random.sample(
+        range(RAND_MATTER_RANGE[0], RAND_MATTER_RANGE[1] + 1), num_event_minutes_items
+    )
+    # Bin/discretize matter num. The bin num for each matter are used to determine the matter type and sponsor of the matter
+    bins = range(0, RAND_MATTER_RANGE[1], RAND_MATTER_RANGE[1] // NUM_COUNCIL_SEATS)
+    bin_nums = [bisect_left(bins, matter_num) for matter_num in matter_nums]
     # Create a list of event minutes item for the event
     event_minutes_items = [
         EventMinutesItem(
@@ -125,12 +155,10 @@ def _get_example_event() -> EventIngestionModel:
             ),
             matter=Matter(
                 name=f"Example Matter {matter_nums[i]}",
-                matter_type=f"Example Matter Type {matter_nums[i]//10}",
+                matter_type=f"Example Matter Type {bin_nums[i]}",
                 title="Example Matter Title",
-                result_status=random.choice(ALL_MATTER_STATUS_DECISION),
-                sponsors=[
-                    _get_example_person(seat_num) for seat_num in sponsors_seats[i]
-                ],
+                result_status=MatterStatusDecision.IN_PROGRESS,
+                sponsors=[_get_example_person(bin_nums[i])],
             ),
             supporting_files=[
                 SupportingFile(
@@ -139,11 +167,11 @@ def _get_example_event() -> EventIngestionModel:
                 )
                 for file_num in range(1, random.randint(1, 5) + 1)
             ],
-            decision=random.choice(ALL_EVENT_MINUTES_ITEM_DECISION),
+            decision=event_minutes_item_decisions[i],
             votes=[
                 Vote(
                     person=_get_example_person(seat_num),
-                    decision=random.choice(ALL_VOTE_DECISION),
+                    decision=vote_decisions[i][seat_num - 1],
                 )
                 for seat_num in range(1, NUM_COUNCIL_SEATS + 1)
             ],
