@@ -119,6 +119,7 @@ def _get_example_event() -> EventIngestionModel:
     sessions = [
         Session(
             session_datetime=datetime.utcnow() + (i * timedelta(hours=3)),
+            session_index=i,
             video_uri=session[0],
             caption_uri=session[1],
         )
