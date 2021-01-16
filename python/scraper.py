@@ -108,7 +108,7 @@ def _get_example_event() -> EventIngestionModel:
             video_uri=session[0],
             caption_uri=session[1],
         )
-        for session in random.sample(SESSIONS, random.randint(1, 3))
+        for i, session in enumerate(random.sample(SESSIONS, random.randint(1, 3)))
     ]
     # Get a number of event minutes items for the event
     num_event_minutes_items = random.randint(*RAND_EVENT_MINUTES_ITEMS_RANGE)
